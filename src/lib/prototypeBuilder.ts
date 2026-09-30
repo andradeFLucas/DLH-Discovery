@@ -9,23 +9,23 @@ export function buildAutonomousSaaSHtml(
 ): string {
   const combinedText = `${title} ${solution} ${problem} ${area}`.toLowerCase();
 
-  // Detecção Inteligente do Domínio de Negócio da Ideia
-  const isSalesFollowup = /lead|noticia|notícia|follow|venda|comercial|prospect|crm|cliente|carteira|mensagem|wpp|whatsapp|caminh|frotist/i.test(combinedText);
+  // Detecção Inteligente do Domínio de Negócio da Ideia (Ordem por especificidade)
+  const isTradeIn = /seminov|usado|troca|fipe|avali|laudo|perici|precifica/i.test(combinedText);
   const isWorkshop = /oficina|pos-venda|pós-venda|revis|mecanic|check-in|checkin|elevador|peca|peça|ordem de serv|os\b/i.test(combinedText);
-  const isTradeIn = /seminov|usado|troca|fipe|avali|laudo|perici/i.test(combinedText);
   const isGamification = /gamif|fideliz|ponto|recompensa|club|voucher/i.test(combinedText);
+  const isSalesFollowup = /lead|noticia|notícia|follow|venda|prospect|crm|carteira|frotist/i.test(combinedText);
 
-  if (isSalesFollowup) {
-    return buildSalesFollowupHtml(title, problem, solution, area, discovery_answers);
+  if (isTradeIn) {
+    return buildTradeInHtml(title, problem, solution, area, discovery_answers);
   }
   if (isWorkshop) {
     return buildWorkshopHtml(title, problem, solution, area, discovery_answers);
   }
-  if (isTradeIn) {
-    return buildTradeInHtml(title, problem, solution, area, discovery_answers);
-  }
   if (isGamification) {
     return buildGamificationHtml(title, problem, solution, area, discovery_answers);
+  }
+  if (isSalesFollowup) {
+    return buildSalesFollowupHtml(title, problem, solution, area, discovery_answers);
   }
 
   // Fallback Genérico Customizado

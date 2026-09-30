@@ -21,6 +21,10 @@ import {
   Terminal,
   AlertTriangle,
   ListChecks,
+  Target,
+  Users,
+  Network,
+  Sparkles,
 } from 'lucide-react';
 import { TechnicalDocAsset } from '@/lib/types';
 import { buildCompletePRDDocument } from '@/lib/gemini';
@@ -36,8 +40,9 @@ export default function TechnicalDocViewer({
 }: TechnicalDocViewerProps) {
   const [copied, setCopied] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [mermaidCopied, setMermaidCopied] = useState(false);
 
-  // Garante que todo o documento tenha as 13 seções preenchidas mesmo em dados legados
+  // Garante que todo o documento tenha as seções ricas preenchidas
   const docAsset = useMemo(() => {
     if (rawDocAsset.macro_modules && rawDocAsset.macro_modules.length > 0 && rawDocAsset.user_stories) {
       return rawDocAsset;
@@ -64,10 +69,22 @@ export default function TechnicalDocViewer({
       error_states: rawDocAsset.error_states || fallback.error_states,
       roadmap_phases: rawDocAsset.roadmap_phases || fallback.roadmap_phases,
       next_steps: rawDocAsset.next_steps || fallback.next_steps,
+      architecture_diagram_mermaid: rawDocAsset.architecture_diagram_mermaid,
+      raci_matrix: rawDocAsset.raci_matrix,
+      success_metrics_okrs: rawDocAsset.success_metrics_okrs,
     };
   }, [rawDocAsset, ideaTitle]);
 
   const sqlCode = docAsset.data_model_sql || '';
+  const mermaidDiagram = docAsset.architecture_diagram_mermaid || `graph TD
+  A[Consultor / Operador] -->|1. Captura| B[Next.js PWA Mobile]
+  B -->|2. API Segura| C[API Gateway / Edge Routes]
+  C -->|3. Visão & Enriquecimento| D[Motor de IA Claude]
+  C -->|4. Bases Externas| E[APIs FIPE / Detran / Leilão]
+  D -->|5. Score & Decisão| C
+  C -->|6. Persistência| F[(PostgreSQL Supabase)]
+  C -->|7. Push Notification| G[Gerente Comercial]
+  F -->|8. Sincronização| H[DMS Linx / Apollo / Totvs]`;
 
   const handlePrintPDF = () => {
     window.print();
@@ -75,9 +92,9 @@ export default function TechnicalDocViewer({
 
   const handleCopyMarkdown = () => {
     let md = `# BANCO DE IDEIAS COM IA · DEALER HUB\n`;
-    md += `## Documento de Especificação Funcional e Técnica (PRD)\n`;
+    md += `## Documento de Especificação Funcional e Técnica (PRD 1.0 Oficial)\n`;
     md += `### Projeto: ${ideaTitle}\n`;
-    md += `Versão: ${docAsset.document_version || '1.0 — Setembro de 2026'}\n\n`;
+    md += `Versão: ${docAsset.document_version || '1.0.0-PROD'}\n\n`;
 
     md += `### 1. Resumo Executivo\n${docAsset.executive_summary || ''}\n\n`;
 
@@ -87,26 +104,68 @@ export default function TechnicalDocViewer({
     });
     md += `\n`;
 
+    if (docAsset.success_metrics_okrs && docAsset.success_metrics_okrs.length > 0) {
+      md += `### 2.1 Métricas de Sucesso e OKRs\n`;
+      docAsset.success_metrics_okrs.forEach((okr, i) => {
+        md += `#### OKR ${i + 1}: ${okr.objective}\n`;
+        md += `- **Prazo:** ${okr.target_timeline} | **ROI Estimado:** ${okr.target_roi}\n`;
+        okr.key_results.forEach((kr) => {
+          md += `  - Key Result: ${kr}\n`;
+        });
+      });
+      md += `\n`;
+    }
+
     md += `### 3. Personas\n`;
     docAsset.personas?.forEach((p) => {
-      md += `#### ${p.persona} (${p.role})\nNecessidades: ${p.needs}\n\n`;
+      md += `- **${p.persona}** (${p.role}): ${p.needs}\n`;
     });
+    md += `\n`;
 
-    md += `### 4. Módulos do Sistema (Macro-Funcionalidades)\n`;
-    docAsset.macro_modules?.forEach((mod) => {
-      md += `#### ${mod.title}\n${mod.objective}\n`;
-      mod.sub_features.forEach((sf) => {
-        md += `- **${sf.name}**: ${sf.description}\n`;
+    if (docAsset.raci_matrix && docAsset.raci_matrix.length > 0) {
+      md += `### 3.1 Matriz RACI de Governança\n`;
+      md += `| Atividade | Responsável (R) | Aprovador (A) | Consultado (C) | Informado (I) |\n`;
+      md += `| :--- | :--- | :--- | :--- | :--- |\n`;
+      docAsset.raci_matrix.forEach((r) => {
+        md += `| ${r.activity} | ${r.responsible} | ${r.accountable} | ${r.consulted} | ${r.informed} |\n`;
       });
+      md += `\n`;
+    }
+
+    md += `### 4. Diagrama de Fluxo e Arquitetura (Mermaid)\n`;
+    md += `\`\`\`mermaid\n${mermaidDiagram}\n\`\`\`\n\n`;
+
+    md += `### 5. Macro-Funcionalidades e Módulos\n`;
+    docAsset.macro_modules?.forEach((mod) => {
+      md += `#### Módulo 0${mod.module_number}: ${mod.title}\n`;
+      md += `**Objetivo:** ${mod.objective}\n\n`;
+      md += `**Sub-funcionalidades:**\n`;
+      mod.sub_features.forEach((sf) => {
+        md += `- **${sf.name}:** ${sf.description} *(Manipula: ${sf.input_or_extraction || 'Dados do sistema'})*\n`;
+      });
+      if (mod.business_rules.length > 0) {
+        md += `\n**Regras de Negócio Obrigatórias:**\n`;
+        mod.business_rules.forEach((br) => {
+          md += `- ${br}\n`;
+        });
+      }
       md += `\n`;
     });
 
-    md += `### 5. Histórias de Usuário\n`;
+    md += `### 6. Histórias de Usuário com Critérios de Aceite (Gherkin)\n`;
     docAsset.user_stories?.forEach((us) => {
-      md += `#### ${us.id} — ${us.title}\n**Ator:** ${us.actor}\n${us.description}\n\n`;
+      md += `#### ${us.id} - ${us.title} (Ator: ${us.actor})\n`;
+      md += `${us.description}\n\n`;
+      if (us.acceptance_criteria_gherkin && us.acceptance_criteria_gherkin.length > 0) {
+        md += `**Critérios de Aceite (Gherkin):**\n`;
+        us.acceptance_criteria_gherkin.forEach((c) => {
+          md += `- ${c}\n`;
+        });
+        md += `\n`;
+      }
     });
 
-    md += `### 6. Script DDL PostgreSQL\n\`\`\`sql\n${sqlCode}\n\`\`\`\n`;
+    md += `### 7. Modelo de Dados SQL (PostgreSQL / Supabase)\n\`\`\`sql\n${sqlCode}\n\`\`\`\n\n`;
 
     navigator.clipboard.writeText(md);
     setCopied(true);
@@ -119,33 +178,24 @@ export default function TechnicalDocViewer({
     setTimeout(() => setSqlCopied(false), 2500);
   };
 
+  const handleCopyMermaid = () => {
+    navigator.clipboard.writeText(mermaidDiagram);
+    setMermaidCopied(true);
+    setTimeout(() => setMermaidCopied(false), 2500);
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Printable CSS Hook para A4 PDF Perfeito */}
+    <div className="space-y-8 animate-in fade-in">
+      {/* Estilos CSS Específicos para Impressão e PDF */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
         @media print {
-          @page {
-            margin: 14mm 16mm;
-            size: A4 portrait;
-          }
           body {
             background: #ffffff !important;
             color: #0f172a !important;
           }
-          body * {
-            visibility: hidden !important;
-          }
-          #print-document,
-          #print-document * {
-            visibility: visible !important;
-          }
           #print-document {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
             background: #ffffff !important;
             color: #0f172a !important;
             padding: 0 !important;
@@ -208,14 +258,14 @@ export default function TechnicalDocViewer({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-white light:text-zinc-900">
-                Documentação Técnica Completa (Padrão PRD 1.0 Oficial)
+                Documentação Técnica Completa (Padrão PRD 1.0 Enterprise)
               </h2>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                13 Seções de Engenharia
+                Mermaid · RACI · OKRs · Gherkin
               </span>
             </div>
             <p className="text-xs text-zinc-400 light:text-zinc-500">
-              Resumo executivo, personas, módulos com regras de negócio, histórias de usuário (US-01 a US-08), DDL relacional e contratos de API.
+              Resumo executivo, personas, matriz RACI, diagramas de fluxo, módulos de engenharia, histórias com Gherkin e schema relacional.
             </p>
           </div>
         </div>
@@ -223,7 +273,7 @@ export default function TechnicalDocViewer({
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={handleCopyMarkdown}
-            className="px-3.5 py-2 rounded-xl bg-zinc-800 light:bg-zinc-100 hover:bg-zinc-700 text-zinc-200 light:text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-2 rounded-xl bg-zinc-800 light:bg-zinc-100 hover:bg-zinc-700 text-zinc-200 light:text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? 'Markdown Copiado!' : 'Copiar .MD'}</span>
@@ -231,7 +281,7 @@ export default function TechnicalDocViewer({
 
           <button
             onClick={handlePrintPDF}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all hover:scale-102"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all hover:scale-102 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>Exportar PDF Oficial</span>
@@ -261,7 +311,7 @@ export default function TechnicalDocViewer({
             <div className="font-semibold text-zinc-300 light:text-zinc-700">
               Documento de Especificação Funcional e Técnica (PRD)
             </div>
-            <div>{docAsset.document_version || 'Versão 1.0 — Setembro de 2026'}</div>
+            <div>{docAsset.document_version || '1.0.0-PROD'}</div>
           </div>
         </div>
 
@@ -278,30 +328,79 @@ export default function TechnicalDocViewer({
         </section>
 
         {/* =========================================================================
-            2. OBJETIVOS DO PRODUTO
+            2. OBJETIVOS DO PRODUTO & OKRS
            ========================================================================= */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5 border-b border-zinc-800 light:border-zinc-200 pb-2">
-            <span className="text-indigo-400">2.</span> Objetivos do Produto
-          </h2>
-          <ul className="space-y-2.5 text-sm text-zinc-300 light:text-zinc-700">
-            {docAsset.product_objectives?.map((obj, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 shrink-0"></span>
-                <span>{obj}</span>
-              </li>
-            ))}
-          </ul>
+        <section className="space-y-6">
+          <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
+            <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5">
+              <span className="text-indigo-400">2.</span> Objetivos do Produto & Métricas de Sucesso (OKRs)
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+              Objetivos Centrais do Projeto:
+            </h3>
+            <ul className="space-y-2.5 text-sm text-zinc-300 light:text-zinc-700">
+              {docAsset.product_objectives?.map((obj, i) => (
+                <li key={i} className="flex items-start gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 shrink-0"></span>
+                  <span>{obj}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* OKRs Estruturados */}
+          {docAsset.success_metrics_okrs && docAsset.success_metrics_okrs.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Matriz de OKRs e Metas de ROI:
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {docAsset.success_metrics_okrs.map((okr, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl bg-zinc-950/70 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {okr.target_timeline}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        ROI: <strong className="text-zinc-200 light:text-zinc-800">{okr.target_roi}</strong>
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-white light:text-zinc-900 leading-snug">
+                      {okr.objective}
+                    </h4>
+                    <ul className="space-y-1.5 text-[11px] text-zinc-400 light:text-zinc-600">
+                      {okr.key_results.map((kr, kIdx) => (
+                        <li key={kIdx} className="flex items-start gap-1.5">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                          <span>{kr}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* =========================================================================
-            3. PERSONAS
+            3. PERSONAS & MATRIZ RACI
            ========================================================================= */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5 border-b border-zinc-800 light:border-zinc-200 pb-2">
-            <span className="text-indigo-400">3.</span> Personas
-          </h2>
+        <section className="space-y-6">
+          <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
+            <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5">
+              <span className="text-indigo-400">3.</span> Personas & Governança Operacional (Matriz RACI)
+            </h2>
+          </div>
 
+          {/* Tabela de Personas */}
           <div className="overflow-x-auto rounded-2xl border border-zinc-800 light:border-zinc-200">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -328,6 +427,50 @@ export default function TechnicalDocViewer({
               </tbody>
             </table>
           </div>
+
+          {/* Matriz RACI */}
+          {docAsset.raci_matrix && docAsset.raci_matrix.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Matriz RACI de Responsabilidades:
+              </h3>
+              <div className="overflow-x-auto rounded-2xl border border-zinc-800 light:border-zinc-200">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-950 light:bg-zinc-100 text-zinc-300 light:text-zinc-700 border-b border-zinc-800 light:border-zinc-200">
+                      <th className="py-3 px-4 font-bold uppercase w-2/5">Atividade / Processo</th>
+                      <th className="py-3 px-3 font-bold text-center text-blue-400">R (Executa)</th>
+                      <th className="py-3 px-3 font-bold text-center text-emerald-400">A (Aprova)</th>
+                      <th className="py-3 px-3 font-bold text-center text-amber-400">C (Consulta)</th>
+                      <th className="py-3 px-3 font-bold text-center text-purple-400">I (Informa)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800 light:divide-zinc-200">
+                    {docAsset.raci_matrix.map((raci, idx) => (
+                      <tr key={idx} className="hover:bg-zinc-800/30 light:hover:bg-zinc-50 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-white light:text-zinc-900 align-top">
+                          {raci.activity}
+                        </td>
+                        <td className="py-3 px-3 text-center text-zinc-300 light:text-zinc-700 align-top text-[11px]">
+                          {raci.responsible}
+                        </td>
+                        <td className="py-3 px-3 text-center text-zinc-300 light:text-zinc-700 align-top text-[11px] font-bold">
+                          {raci.accountable}
+                        </td>
+                        <td className="py-3 px-3 text-center text-zinc-400 light:text-zinc-600 align-top text-[11px]">
+                          {raci.consulted}
+                        </td>
+                        <td className="py-3 px-3 text-center text-zinc-400 light:text-zinc-600 align-top text-[11px]">
+                          {raci.informed}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* =========================================================================
@@ -354,7 +497,7 @@ export default function TechnicalDocViewer({
         </section>
 
         {/* =========================================================================
-            5. MÓDULOS DO SISTEMA (MACRO-FUNCIONALIDADES)
+            5. MÓDULOS DO SISTEMA (MACRO-FUNCIONALIDADES HIPER-ESPECÍFICAS)
            ========================================================================= */}
         <section className="space-y-6">
           <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
@@ -436,20 +579,43 @@ export default function TechnicalDocViewer({
         </section>
 
         {/* =========================================================================
-            9. ARQUITETURA TÉCNICA & JUSTIFICATIVA DA STACK
+            6. ARQUITETURA TÉCNICA & DIAGRAMA MERMAID
            ========================================================================= */}
         <section className="space-y-6 page-break">
-          <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5 border-b border-zinc-800 light:border-zinc-200 pb-2">
-            <span className="text-indigo-400">9.</span> Arquitetura Técnica & Justificativa da Stack
-          </h2>
+          <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
+            <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5">
+              <span className="text-indigo-400">6.</span> Arquitetura Técnica & Diagrama de Fluxo (Mermaid)
+            </h2>
+            <p className="text-xs text-zinc-400 light:text-zinc-500 mt-1">
+              Topologia da infraestrutura, microsserviços, agentes de IA e integrações com bases externas.
+            </p>
+          </div>
 
-          <p className="text-xs text-zinc-300 light:text-zinc-700 leading-relaxed">
-            Stack definida: <strong>Next.js (framework) + Supabase (banco de dados/auth/storage) + Vercel (hospedagem)</strong>.
-          </p>
+          {/* Bloco do Diagrama Mermaid */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-300 flex items-center gap-2">
+                <Network className="w-4 h-4 text-indigo-400" />
+                Diagrama Arquitetural de Fluxo de Dados (Mermaid 1.0):
+              </span>
+              <button
+                onClick={handleCopyMermaid}
+                className="no-print px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                {mermaidCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{mermaidCopied ? 'Mermaid Copiado!' : 'Copiar Código Mermaid'}</span>
+              </button>
+            </div>
 
+            <pre className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto leading-relaxed">
+              <code>{mermaidDiagram}</code>
+            </pre>
+          </div>
+
+          {/* Justificativa da Stack */}
           <div className="space-y-4 text-xs">
             <div className="p-4 rounded-xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2">
-              <h4 className="font-bold text-sm text-indigo-400">9.1 Por que Next.js</h4>
+              <h4 className="font-bold text-sm text-indigo-400">6.1 Por que Next.js (App Router)</h4>
               <ul className="space-y-1.5 text-zinc-300 light:text-zinc-700 list-disc list-inside">
                 {docAsset.architecture_justification?.nextjs.map((item, i) => (
                   <li key={i}>{item}</li>
@@ -458,7 +624,7 @@ export default function TechnicalDocViewer({
             </div>
 
             <div className="p-4 rounded-xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2">
-              <h4 className="font-bold text-sm text-indigo-400">9.2 Por que Supabase</h4>
+              <h4 className="font-bold text-sm text-indigo-400">6.2 Por que Supabase (PostgreSQL + RLS)</h4>
               <ul className="space-y-1.5 text-zinc-300 light:text-zinc-700 list-disc list-inside">
                 {docAsset.architecture_justification?.supabase.map((item, i) => (
                   <li key={i}>{item}</li>
@@ -467,18 +633,9 @@ export default function TechnicalDocViewer({
             </div>
 
             <div className="p-4 rounded-xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2">
-              <h4 className="font-bold text-sm text-indigo-400">9.3 Por que Vercel</h4>
+              <h4 className="font-bold text-sm text-indigo-400">6.3 Por que Vercel Enterprise</h4>
               <ul className="space-y-1.5 text-zinc-300 light:text-zinc-700 list-disc list-inside">
                 {docAsset.architecture_justification?.vercel.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="p-4 rounded-xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2">
-              <h4 className="font-bold text-sm text-indigo-400">9.4 Visão de Componentes da Arquitetura</h4>
-              <ul className="space-y-1.5 text-zinc-300 light:text-zinc-700 list-disc list-inside">
-                {docAsset.architecture_justification?.components.map((item, i) => (
                   <li key={i}>{item}</li>
                 ))}
               </ul>
@@ -487,23 +644,23 @@ export default function TechnicalDocViewer({
         </section>
 
         {/* =========================================================================
-            10. HISTÓRIAS DE USUÁRIO DETALHADAS (US-01 a US-08+)
+            7. HISTÓRIAS DE USUÁRIO DETALHADAS COM GHERKIN
            ========================================================================= */}
         <section className="space-y-4 page-break">
           <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
             <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5">
-              <span className="text-indigo-400">10.</span> Histórias de Usuário Detalhadas
+              <span className="text-indigo-400">7.</span> Histórias de Usuário & Critérios de Aceite (Gherkin)
             </h2>
             <p className="text-xs text-zinc-400 light:text-zinc-500 mt-1">
-              Fluxo completo descrito em nível de interação: cliques, o que aparece na tela (campos, pop-ups) e o que o sistema confirma de volta.
+              Fluxo completo descrito em nível de interação com critérios de aceite formais (Dado que / Quando / Então).
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5">
+          <div className="grid grid-cols-1 gap-4">
             {docAsset.user_stories?.map((us) => (
               <div
                 key={us.id}
-                className="p-4 rounded-2xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2 text-xs"
+                className="p-5 rounded-2xl bg-zinc-950/70 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-3 text-xs"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -516,30 +673,48 @@ export default function TechnicalDocViewer({
                     Ator: <strong className="text-zinc-200 light:text-zinc-800">{us.actor}</strong>
                   </div>
                 </div>
+
                 <p className="text-zinc-300 light:text-zinc-700 leading-relaxed">{us.description}</p>
+
+                {/* Critérios de Aceite Gherkin */}
+                {us.acceptance_criteria_gherkin && us.acceptance_criteria_gherkin.length > 0 && (
+                  <div className="p-3 rounded-xl bg-zinc-900/70 light:bg-zinc-100 border border-zinc-800/80 light:border-zinc-200 space-y-1.5">
+                    <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                      Critérios de Aceite (Gherkin):
+                    </div>
+                    <ul className="space-y-1 text-[11px] text-zinc-300 light:text-zinc-700 font-mono">
+                      {us.acceptance_criteria_gherkin.map((crit, cIdx) => (
+                        <li key={cIdx} className="flex items-start gap-1.5">
+                          <span className="text-emerald-400">✔</span>
+                          <span>{crit}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </section>
 
         {/* =========================================================================
-            11. ANEXO TÉCNICO DE IMPLEMENTAÇÃO
+            8. ANEXO TÉCNICO DE IMPLEMENTAÇÃO & SCHEMA SQL
            ========================================================================= */}
         <section className="space-y-6 page-break">
           <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
             <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5">
-              <span className="text-indigo-400">11.</span> Anexo Técnico de Implementação
+              <span className="text-indigo-400">8.</span> Anexo Técnico de Implementação
             </h2>
             <p className="text-xs text-zinc-400 light:text-zinc-500 mt-1">
               Especificações para desenvolvedores: modelo de dados relacional, rotas, contratos de API/IA e políticas RLS.
             </p>
           </div>
 
-          {/* 11.1 Modelo de Dados & Dicionário de Tabelas */}
+          {/* 8.1 Modelo de Dados & Dicionário de Tabelas */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
               <Database className="w-4 h-4" />
-              11.1 Modelo de Dados (Supabase / PostgreSQL)
+              8.1 Modelo de Dados Relacional (PostgreSQL / Supabase)
             </h3>
 
             <div className="space-y-4">
@@ -582,7 +757,7 @@ export default function TechnicalDocViewer({
                 <span className="text-xs font-bold text-zinc-300">Script SQL DDL Executável com RLS:</span>
                 <button
                   onClick={handleCopySql}
-                  className="no-print px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="no-print px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {sqlCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{sqlCopied ? 'DDL Copiado!' : 'Copiar Script SQL'}</span>
@@ -594,143 +769,47 @@ export default function TechnicalDocViewer({
             </div>
           </div>
 
-          {/* 11.2 Rotas das Aplicações */}
-          <div className="space-y-3 pt-4 border-t border-zinc-800 light:border-zinc-200">
-            <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
-              <Route className="w-4 h-4" />
-              11.2 Rotas das Aplicações
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {docAsset.app_routes?.map((app, i) => (
-                <div
-                  key={i}
-                  className="p-4 rounded-2xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2"
-                >
-                  <h4 className="font-bold text-xs text-white light:text-zinc-900 border-b border-zinc-800/60 pb-1.5">
-                    {app.app_name}
-                  </h4>
-                  <ul className="space-y-1.5 text-zinc-300 light:text-zinc-700">
-                    {app.routes.map((r, idx) => (
-                      <li key={idx} className="flex items-start gap-2 font-mono text-[11px]">
-                        <strong className="text-indigo-400 shrink-0">{r.path}</strong>
-                        <span className="font-sans text-zinc-400">{r.description}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 11.3 Contratos de IA & APIs REST */}
+          {/* 8.2 Contratos de API & IA */}
           <div className="space-y-3 pt-4 border-t border-zinc-800 light:border-zinc-200">
             <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
               <Cpu className="w-4 h-4" />
-              11.3 Contratos de IA & Integrações (Entrada / Saída)
+              8.2 Contratos de API REST & Endpoints
             </h3>
-
             <div className="space-y-3">
-              {docAsset.ai_contracts?.map((c, i) => (
+              {docAsset.api_endpoints?.map((ep, idx) => (
                 <div
-                  key={i}
+                  key={idx}
                   className="p-4 rounded-2xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2 text-xs"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white light:text-zinc-900">{c.name}</span>
-                    <span className="font-mono text-indigo-400 font-semibold">{c.method} {c.endpoint}</span>
-                  </div>
-                  <p className="text-zinc-400">{c.description}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-[10px]">
-                    {c.input_payload && (
-                      <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
-                        <div className="text-zinc-500 font-bold mb-1 font-sans">Payload de Entrada (JSON):</div>
-                        <pre className="text-zinc-300 overflow-x-auto"><code>{c.input_payload}</code></pre>
-                      </div>
-                    )}
-                    <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
-                      <div className="text-zinc-500 font-bold mb-1 font-sans">Retorno Esperado (JSON):</div>
-                      <pre className="text-emerald-300 overflow-x-auto"><code>{c.output_payload}</code></pre>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                        {ep.method}
+                      </span>
+                      <span className="font-mono font-semibold text-white light:text-zinc-900">{ep.path}</span>
                     </div>
+                    <span className="text-zinc-400 text-[11px]">{ep.description}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 11.4 Políticas RLS */}
+          {/* 8.3 Políticas RLS */}
           <div className="space-y-3 pt-4 border-t border-zinc-800 light:border-zinc-200">
             <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4" />
-              11.4 Políticas de Acesso (Row Level Security - RLS)
+              8.3 Políticas de Acesso e Isolamento Multi-Tenant (RLS)
             </h3>
-
-            <div className="space-y-2 text-xs">
-              {docAsset.rls_policies?.map((pol, i) => (
-                <div
-                  key={i}
-                  className="p-3.5 rounded-xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-1"
-                >
-                  <div className="font-mono font-bold text-indigo-300">Tabela: {pol.table}</div>
-                  <ul className="space-y-1 list-disc list-inside text-zinc-400">
-                    {pol.rules.map((r, idx) => (
-                      <li key={idx}>{r}</li>
+            <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2 text-xs font-mono text-zinc-300">
+              {docAsset.rls_policies?.map((policy, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="text-indigo-400 font-bold">Tabela: {policy.table}</div>
+                  <ul className="space-y-1 pl-4 text-zinc-400 list-disc">
+                    {policy.rules.map((r, rIdx) => (
+                      <li key={rIdx}>{r}</li>
                     ))}
                   </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 11.5 Variáveis de Ambiente */}
-          <div className="space-y-3 pt-4 border-t border-zinc-800 light:border-zinc-200">
-            <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
-              <Terminal className="w-4 h-4" />
-              11.5 Variáveis de Ambiente
-            </h3>
-
-            <div className="overflow-x-auto rounded-2xl border border-zinc-800 light:border-zinc-200">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-950 light:bg-zinc-100 text-zinc-300 light:text-zinc-700 border-b border-zinc-800 light:border-zinc-200">
-                    <th className="py-2.5 px-3.5 font-bold font-mono">Variável</th>
-                    <th className="py-2.5 px-3.5 font-bold">Finalidade</th>
-                    <th className="py-2.5 px-3.5 font-bold">Escopo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800 light:divide-zinc-200">
-                  {docAsset.env_vars?.map((ev, i) => (
-                    <tr key={i}>
-                      <td className="py-2 px-3.5 font-mono font-semibold text-indigo-300">{ev.variable}</td>
-                      <td className="py-2 px-3.5 text-zinc-300 light:text-zinc-700">{ev.purpose}</td>
-                      <td className="py-2 px-3.5 font-mono text-[11px] text-zinc-400">{ev.scope}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* 11.6 Estados de Erro e Vazio */}
-          <div className="space-y-3 pt-4 border-t border-zinc-800 light:border-zinc-200">
-            <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              11.6 Estados de Erro e Contingência
-            </h3>
-
-            <div className="space-y-2 text-xs">
-              {docAsset.error_states?.map((err, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                >
-                  <div>
-                    <strong className="text-white light:text-zinc-900">{err.scenario}:</strong>{' '}
-                    <span className="text-zinc-300 light:text-zinc-700">{err.system_behavior}</span>
-                  </div>
-                  <span className="text-[11px] text-amber-400 font-semibold shrink-0">
-                    Ação: {err.user_action}
-                  </span>
                 </div>
               ))}
             </div>
@@ -738,28 +817,28 @@ export default function TechnicalDocViewer({
         </section>
 
         {/* =========================================================================
-            12. ROADMAP SUGERIDO (MVP EM FASES)
+            9. ROADMAP DE IMPLEMENTAÇÃO EM FASES
            ========================================================================= */}
         <section className="space-y-4 page-break">
-          <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5 border-b border-zinc-800 light:border-zinc-200 pb-2">
-            <span className="text-indigo-400">12.</span> Roadmap Sugerido (MVP em Fases)
-          </h2>
+          <div className="border-b border-zinc-800 light:border-zinc-200 pb-2">
+            <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5">
+              <span className="text-indigo-400">9.</span> Roadmap Sugerido (MVP em Fases)
+            </h2>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            {docAsset.roadmap_phases?.map((rp) => (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            {docAsset.roadmap_phases?.map((phase) => (
               <div
-                key={rp.phase_number}
+                key={phase.phase_number}
                 className="p-4 rounded-2xl bg-zinc-950/60 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-sm text-white light:text-zinc-900">{rp.title}</h4>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 font-mono">
-                    {rp.duration}
-                  </span>
+                  <h3 className="font-bold text-white light:text-zinc-900">{phase.title}</h3>
+                  <span className="text-[10px] font-mono text-indigo-400">{phase.duration}</span>
                 </div>
-                <ul className="space-y-1 text-zinc-400 light:text-zinc-600 list-disc list-inside">
-                  {rp.deliverables.map((del, i) => (
-                    <li key={i}>{del}</li>
+                <ul className="space-y-1 text-zinc-400 list-disc list-inside">
+                  {phase.deliverables.map((deliv, idx) => (
+                    <li key={idx}>{deliv}</li>
                   ))}
                 </ul>
               </div>
@@ -767,28 +846,12 @@ export default function TechnicalDocViewer({
           </div>
         </section>
 
-        {/* =========================================================================
-            13. PRÓXIMOS PASSOS
-           ========================================================================= */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-bold text-white light:text-zinc-900 flex items-center gap-2.5 border-b border-zinc-800 light:border-zinc-200 pb-2">
-            <span className="text-indigo-400">13.</span> Próximos Passos
-          </h2>
-
-          <ul className="space-y-2 text-xs text-zinc-300 light:text-zinc-700">
-            {docAsset.next_steps?.map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span>{step}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Rodapé Oficial de Homologação */}
-        <div className="pt-8 border-t border-zinc-800 light:border-zinc-200 flex flex-wrap items-center justify-between gap-4 text-xs text-zinc-500">
+        {/* Rodapé Oficial */}
+        <div className="pt-8 border-t border-zinc-800 light:border-zinc-200 text-center text-xs text-zinc-500 space-y-1">
           <div>Dealer Hub · Sistema Integrado de Inovação & Governança</div>
-          <div className="font-mono">Documento gerado automaticamente com auxílio de Inteligência Artificial</div>
+          <div className="font-mono text-[10px]">
+            Documento gerado com auxílio de Inteligência Artificial para fins de especificação técnica e governança.
+          </div>
         </div>
       </div>
     </div>

@@ -17,8 +17,9 @@ import {
   HelpCircle,
   Clock,
   Check,
-  FlaskConical,
   Zap,
+  FlaskConical,
+  FolderArchive,
 } from 'lucide-react';
 import { DISCOVERY_BLOCKS, DiscoveryQuestion } from '@/lib/discoveryQuestions';
 import { GeneratedAssets, PrototypeAsset } from '@/lib/types';
@@ -30,6 +31,7 @@ import TechnicalDocViewer from '@/components/artifacts/TechnicalDocViewer';
 import PitchDeckViewer from '@/components/artifacts/PitchDeckViewer';
 import { generateWithMultiAgents } from '@/lib/agents';
 import { TEST_EXAMPLES, TestExample } from '@/lib/testExamples';
+import { generateFullZipPackage } from '@/lib/exportZipPackage';
 
 const BUSINESS_AREAS = [
   'Pós-Venda / Oficina',
@@ -72,7 +74,7 @@ export default function EphemeralDiscovery() {
   const [isSkipModalOpen, setIsSkipModalOpen] = useState(false);
   const [questionToSkip, setQuestionToSkip] = useState<DiscoveryQuestion | null>(null);
 
-  // Test Examples Modal State
+  // Modal de Exemplos
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
 
   // Generation & Assets State
@@ -83,6 +85,7 @@ export default function EphemeralDiscovery() {
 
   // Feedback states
   const [copied, setCopied] = useState(false);
+  const [isGeneratingZip, setIsGeneratingZip] = useState(false);
 
   // Rotating loading messages
   useEffect(() => {
@@ -348,6 +351,35 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadZipPackage = async () => {
+    if (!assets) return;
+    try {
+      setIsGeneratingZip(true);
+      const blob = await generateFullZipPackage({
+        title,
+        area,
+        problem,
+        solution,
+        answers,
+        assets,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const sanitized = title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40) || 'proposta';
+      a.download = `Pacote_Completo_${sanitized}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Erro ao gerar pacote ZIP:', err);
+      alert('Ocorreu um erro ao gerar o pacote ZIP com todos os arquivos. Tente novamente.');
+    } finally {
+      setIsGeneratingZip(false);
+    }
+  };
+
   const currentBlock = DISCOVERY_BLOCKS[currentBlockIndex];
   const totalBlocks = DISCOVERY_BLOCKS.length;
   const progressPercent = Math.round(((currentBlockIndex + 1) / totalBlocks) * 100);
@@ -382,7 +414,7 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
                     Descreva aqui sua ideia
                   </h2>
                   <p className="text-xs text-zinc-400 light:text-zinc-500 mt-0.5">
-                    Preencha os dados ou use um dos exemplos prontos para testar a IA.
+                    Preencha os dados ou selecione um exemplo prático pronto para processar na IA.
                   </p>
                 </div>
 
@@ -392,7 +424,7 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600/20 to-blue-600/20 hover:from-purple-600/30 hover:to-blue-600/30 border border-purple-500/30 text-purple-300 light:text-purple-700 text-xs font-bold transition-all shadow-sm hover:scale-105 self-start sm:self-auto cursor-pointer"
                 >
                   <FlaskConical className="w-4 h-4 text-purple-400" />
-                  <span>Teste Rápido (3 Exemplos)</span>
+                  <span>Exemplos Prontos (3 Cenários)</span>
                 </button>
               </div>
 
@@ -512,10 +544,10 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
               <button
                 type="button"
                 onClick={() => setIsTestModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 light:text-purple-700 text-xs font-semibold transition-all hover:scale-105"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 light:text-purple-700 text-xs font-semibold transition-all hover:scale-105 cursor-pointer"
               >
                 <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
-                <span>Trocar por Exemplo</span>
+                <span>Carregar Outro Exemplo</span>
               </button>
 
               <span className="text-xs font-mono text-zinc-500 hidden sm:inline">
@@ -625,16 +657,16 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
         </div>
       )}
 
-      {/* ================= MODAL DE EXEMPLOS DE TESTE ================= */}
+      {/* ================= MODAL DE EXEMPLOS PRONTOS ================= */}
       <Modal
         isOpen={isTestModalOpen}
         onClose={() => setIsTestModalOpen(false)}
-        title="Exemplos Prontos para Teste da IA"
+        title="Cenários Prontos para Geração com IA"
         size="lg"
       >
         <div className="space-y-4">
           <p className="text-xs text-zinc-400 light:text-zinc-600 leading-relaxed">
-            Escolha um dos 3 cenários práticos de concessionária abaixo. Cada exemplo preenche automaticamente o desafio inicial e <strong>todas as 16 perguntas técnicas do Discovery</strong>.
+            Escolha um dos 3 cenários práticos do setor automotivo. As respostas do Discovery serão preenchidas e submetidas ao <strong>motor de Inteligência Artificial</strong> para construir o protótipo, documentação técnica e pitch em tempo real.
           </p>
 
           <div className="space-y-3.5 max-h-[65vh] overflow-y-auto pr-1">
@@ -664,24 +696,24 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-zinc-800/60 light:border-zinc-200/80 gap-3">
                   <span className="text-[11px] text-zinc-500 flex items-center gap-1.5 font-mono">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    16 perguntas do Discovery respondidas
+                    16 respostas de Discovery pré-estruturadas
                   </span>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto">
                     <button
                       type="button"
                       onClick={() => handleApplyExample(ex, false)}
-                      className="px-3 py-1.5 rounded-xl border border-zinc-700 light:border-zinc-300 hover:bg-zinc-800 light:hover:bg-zinc-100 text-xs font-semibold text-zinc-300 light:text-zinc-700 transition-colors"
-                      title="Preenche tudo e entra no Discovery para você revisar bloco a bloco"
+                      className="px-3 py-1.5 rounded-xl border border-zinc-700 light:border-zinc-300 hover:bg-zinc-800 light:hover:bg-zinc-100 text-xs font-semibold text-zinc-300 light:text-zinc-700 transition-colors cursor-pointer"
+                      title="Preenche os dados e entra no Discovery para você revisar ou editar antes de gerar"
                     >
-                      Ver Perguntas
+                      Revisar Perguntas
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleApplyExample(ex, true)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all hover:scale-105"
-                      title="Preenche tudo e dispara a IA imediatamente para gerar os 4 artefatos"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all hover:scale-105 cursor-pointer"
+                      title="Envia as respostas imediatamente para o pipeline de IA gerar os artefatos"
                     >
                       <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
                       <span>Gerar com IA</span>
@@ -693,6 +725,7 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
           </div>
         </div>
       </Modal>
+
 
       {/* ================= ETAPA 3: GERANDO COM IA ================= */}
       {step === 'generating' && (
@@ -740,12 +773,12 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
               </h1>
             </div>
 
-            {/* Ações Rápidas: Copiar, Baixar e Novo Discovery */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Ações Rápidas: Copiar, Baixar ZIP Completo e Novo Discovery */}
+            <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={handleCopySummary}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 light:bg-zinc-100 hover:bg-zinc-700 light:hover:bg-zinc-200 text-xs font-semibold text-zinc-200 light:text-zinc-800 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 light:bg-zinc-100 hover:bg-zinc-700 light:hover:bg-zinc-200 text-xs font-semibold text-zinc-200 light:text-zinc-800 transition-colors cursor-pointer"
                 title="Copiar texto da aba ativa para área de transferência"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -754,18 +787,29 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
 
               <button
                 type="button"
+                onClick={handleDownloadZipPackage}
+                disabled={isGeneratingZip}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-xs font-bold text-white shadow-lg shadow-emerald-600/25 transition-all hover:scale-105 disabled:opacity-50 cursor-pointer"
+                title="Baixar pacote completo com Protótipo HTML, Documento em Word (.docx), Apresentação em PowerPoint (.pptx) e Markdown"
+              >
+                <FolderArchive className="w-4 h-4" />
+                <span>{isGeneratingZip ? 'Compactando ZIP...' : 'Baixar Tudo (.ZIP Completo)'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleDownloadFullPackage}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow transition-all hover:scale-105"
-                title="Baixar pacote completo de documentação em Markdown (.md)"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-700 light:border-zinc-300 hover:bg-zinc-800 light:hover:bg-zinc-100 text-xs font-semibold text-zinc-300 light:text-zinc-700 transition-colors cursor-pointer"
+                title="Baixar pacote de documentação resumido em Markdown (.md)"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Baixar Pacote (.md)</span>
+                <span>Apenas .MD</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-800 light:border-zinc-300 hover:bg-zinc-900 light:hover:bg-zinc-100 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-800 light:border-zinc-300 hover:bg-zinc-900 light:hover:bg-zinc-100 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Novo Discovery</span>
@@ -798,7 +842,13 @@ ${s.bullets?.map((b: string) => `- ${b}`).join('\n')}
           {/* Conteúdo da Aba Ativa */}
           <div className="min-h-[500px]">
             {activeTab === 'prototype' && assets.prototype && (
-              <InteractivePrototype prototype={assets.prototype} ideaTitle={title} />
+              <InteractivePrototype
+                prototype={assets.prototype}
+                ideaTitle={title}
+                onUpdatePrototype={(updatedProto) => {
+                  setAssets((prev) => (prev ? { ...prev, prototype: updatedProto } : prev));
+                }}
+              />
             )}
 
             {activeTab === 'techdoc' && assets.technical_doc && (

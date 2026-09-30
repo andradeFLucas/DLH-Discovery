@@ -1181,20 +1181,24 @@ export async function refinePrototypeAsset(
     process.env.GEMINI_API_KEY;
 
   if (apiKey && currentHtml) {
-    const prompt = `Você é um Engenheiro de Front-end e Designer de Interfaces Senior.
-Modifique o seguinte código HTML/CSS completo de uma aplicação SaaS para incorporar a instrução de ajuste do usuário.
+    const prompt = `Você é um Arquiteto Frontend e Designer UI/UX Senior especialista na metodologia UI-UX Pro Max.
+Modifique o seguinte código HTML/CSS/JS de uma aplicação SaaS para incorporar exatamente a instrução de ajuste solicitada pelo usuário.
 
-INSTRUÇÃO DO USUÁRIO: "${instruction}"
+INSTRUÇÃO DE AJUSTE DO USUÁRIO: "${instruction}"
 TÍTULO DO PROJETO: "${ideaTitle}"
 
 CÓDIGO HTML ATUAL:
 ${currentHtml}
 
-REGRAS ESTITAS:
-1. Retorne APENAS o código HTML completo atualizado, iniciando com <!DOCTYPE html> e terminando com </html>.
-2. Não inclua explicações antes ou depois, apenas o código puro (ou dentro de bloco \`\`\`html).
-3. Mantenha o design responsivo com Tailwind CSS via CDN e interatividade funcional em JavaScript.
-4. Mantenha a barra lateral e os elementos do sistema consistentes.`;
+REGRAS DE REFINAMENTO:
+1. SE A INSTRUÇÃO FOR MUDANÇA DE TEMA (ex: tema branco, tema claro, light mode):
+   - Altere a tag <html> para class="light" (ou remova a classe "dark").
+   - Substitua classes de fundo escuro (bg-slate-950, bg-zinc-950, bg-slate-900, bg-black) por fundos claros modernos (bg-slate-50, bg-white, bg-zinc-100).
+   - Substitua textos claros (text-white, text-slate-100) por textos escuros legíveis (text-slate-900, text-zinc-900, text-slate-700).
+   - Ajuste as bordas para border-slate-200 / border-zinc-300.
+2. SE A INSTRUÇÃO FOR ADICIONAR BOTÕES, ABAS OU MUDAR CORES:
+   - Adicione os elementos mantendo o JavaScript interativo funcional (showTab, openModal, etc.).
+3. Retorne APENAS o código HTML completo atualizado, iniciando estritamente com <!DOCTYPE html> e terminando com </html>.`;
 
     const updatedHtml = await callAI(
       prompt,
@@ -1202,9 +1206,9 @@ REGRAS ESTITAS:
     );
     if (updatedHtml) {
       const cleanHtml = updatedHtml
-        .replace(/^```html\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
+        .replace(/^```html\s*/im, '')
+        .replace(/^```\s*/im, '')
+        .replace(/\s*```$/im, '')
         .trim();
 
       if (cleanHtml.includes('<!DOCTYPE html>') || cleanHtml.includes('<html')) {

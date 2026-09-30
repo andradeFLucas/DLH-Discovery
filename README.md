@@ -134,6 +134,15 @@ Por trás da interface simples e intuitiva, opera um pipeline de alta tecnologia
 
 ---
 
+## 🎨 Design System & Experiência do Usuário (UI/UX)
+
+A interface e os fluxos do Dealer Hub são desenvolvidos utilizando os padrões da metodologia **UI-UX Pro Max** ([uupm.cc](https://uupm.cc/)), garantindo alta escaneabilidade, estética moderna automotiva ("Grafite & Verde Oficina") e acessibilidade.
+
+- 📖 **Documentação Completa do Design System:** Consulte [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
+- ⚡ **Skill do Agente:** Configurada em [`.agents/skills/ui-ux-pro-max/SKILL.md`](.agents/skills/ui-ux-pro-max/SKILL.md).
+
+---
+
 <p align="center">
   Desenvolvido com excelência estratégica para impulsionar a transformação digital no setor automotivo.<br>
   <strong>Dealer Hub • Mape.ia — Todos os direitos reservados.</strong>

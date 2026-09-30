@@ -139,6 +139,22 @@ export interface DetailedUserStory {
   title: string;
   actor: string;
   description: string;
+  acceptance_criteria_gherkin?: string[];
+}
+
+export interface RaciItem {
+  activity: string;
+  responsible: string; // Quem executa
+  accountable: string; // Quem aprova/responde
+  consulted: string;   // Quem é consultado
+  informed: string;    // Quem é informado
+}
+
+export interface SuccessMetricOkr {
+  objective: string;
+  key_results: string[];
+  target_timeline: string;
+  target_roi: string;
 }
 
 export interface DatabaseColumnSpec {
@@ -191,6 +207,8 @@ export interface TechnicalDocAsset {
   document_version?: string;
   executive_summary?: string;
   product_objectives?: string[];
+  success_metrics_okrs?: SuccessMetricOkr[];
+  raci_matrix?: RaciItem[];
 
   // 2. Personas e Fluxo
   personas?: PersonaItem[];
@@ -201,6 +219,7 @@ export interface TechnicalDocAsset {
 
   // 4. Arquitetura e Stack
   architecture_overview?: string;
+  architecture_diagram_mermaid?: string;
   tech_stack?: {
     frontend: string;
     backend: string;
