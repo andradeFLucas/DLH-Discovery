@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { generateWithMultiAgents } from '@/lib/agents';
 
+export const maxDuration = 60; // Timeout estendido para execuções de multi-agentes no Vercel
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
