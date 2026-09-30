@@ -1,26 +1,178 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Tema por classe (.dark / .light no <html>), não por prefers-color-scheme.
+ * Código "dark-first": classes base = tema escuro, prefixo `light:` sobrepõe.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where(.light, .light *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* =========================================================================
+ * IDENTIDADE VISUAL — "Grafite & Verde Oficina"
+ * Neutros grafite de cast frio; um único acento verde-petróleo (herança
+ * automotiva, não o azul/roxo genérico). Raios contidos, elevação plana,
+ * dados em fonte monoespaçada. Aplicado remapeando a paleta base do Tailwind,
+ * então cada `bg-zinc-900`, `text-blue-400`, etc. já herda a nova identidade.
+ * ========================================================================= */
+@theme {
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Neutros — grafite frio (substitui o zinc puro) */
+  --color-zinc-50:  #f6f7f8;
+  --color-zinc-100: #edeef0;
+  --color-zinc-200: #dee0e3;
+  --color-zinc-300: #c6c9ce;
+  --color-zinc-400: #949aa2;
+  --color-zinc-500: #767b83;
+  --color-zinc-600: #4c515a;
+  --color-zinc-700: #383d45;
+  --color-zinc-800: #262a31;
+  --color-zinc-900: #191c21;
+  --color-zinc-950: #101216;
+
+  /* Acento — verde-petróleo fosco (substitui blue) */
+  --color-blue-50:  #e6efec;
+  --color-blue-100: #cbe0d9;
+  --color-blue-200: #a6ccc1;
+  --color-blue-300: #7db5a7;
+  --color-blue-400: #55a491;
+  --color-blue-500: #2e7d6b;
+  --color-blue-600: #1f5e51;
+  --color-blue-700: #184a40;
+  --color-blue-800: #123a33;
+  --color-blue-900: #0e2e29;
+  --color-blue-950: #08201c;
+
+  /* Secundários dobrados no mesmo acento (menos cores = mais elegante) */
+  --color-indigo-50:  #e6efec;
+  --color-indigo-100: #cbe0d9;
+  --color-indigo-200: #a6ccc1;
+  --color-indigo-300: #7db5a7;
+  --color-indigo-400: #55a491;
+  --color-indigo-500: #2e7d6b;
+  --color-indigo-600: #1f5e51;
+  --color-indigo-700: #184a40;
+  --color-indigo-800: #123a33;
+  --color-indigo-900: #0e2e29;
+  --color-indigo-950: #08201c;
+
+  --color-cyan-50:  #e6efec;
+  --color-cyan-100: #cbe0d9;
+  --color-cyan-200: #a6ccc1;
+  --color-cyan-300: #7db5a7;
+  --color-cyan-400: #6fb0a2;
+  --color-cyan-500: #2e7d6b;
+  --color-cyan-600: #1f5e51;
+  --color-cyan-700: #184a40;
+
+  /* Papéis / administração — ardósia arroxeada fosca (substitui purple) */
+  --color-purple-50:  #eceef4;
+  --color-purple-100: #dadde9;
+  --color-purple-200: #bcc1d8;
+  --color-purple-300: #9599bf;
+  --color-purple-400: #8388b5;
+  --color-purple-500: #5b608c;
+  --color-purple-600: #474c74;
+  --color-purple-700: #3a3e5f;
+  --color-purple-800: #30334c;
+  --color-purple-900: #282a3d;
+  --color-purple-950: #1b1c2b;
+
+  /* Positivo — musgo (substitui emerald) */
+  --color-emerald-50:  #e7f0ea;
+  --color-emerald-100: #cbe1d1;
+  --color-emerald-200: #a3cbb0;
+  --color-emerald-300: #78b28d;
+  --color-emerald-400: #5e9e77;
+  --color-emerald-500: #3f8560;
+  --color-emerald-600: #2f6b4d;
+  --color-emerald-700: #23523c;
+  --color-emerald-800: #1c4130;
+  --color-emerald-900: #163325;
+
+  /* Atenção — ocre (substitui amber) */
+  --color-amber-50:  #f6eedd;
+  --color-amber-100: #ebdbb8;
+  --color-amber-200: #ddc190;
+  --color-amber-300: #d3b072;
+  --color-amber-400: #c0954a;
+  --color-amber-500: #a8792d;
+  --color-amber-600: #8c6420;
+  --color-amber-700: #6f4f1a;
+  --color-amber-800: #573e15;
+  --color-amber-900: #46330f;
+
+  /* Crítico — tijolo (substitui red) */
+  --color-red-50:  #f6e7e5;
+  --color-red-100: #ebc9c5;
+  --color-red-200: #dda6a0;
+  --color-red-300: #d59089;
+  --color-red-400: #c86b62;
+  --color-red-500: #b54a40;
+  --color-red-600: #9a3a31;
+  --color-red-700: #7c2f28;
+  --color-red-800: #632621;
+  --color-red-900: #511f1b;
+
+  /* Raios contidos */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.9375rem;
+
+  /* Elevação plana — sem glow, sombras quase imperceptíveis */
+  --shadow-2xs: 0 1px 1px rgba(16, 18, 22, 0.03);
+  --shadow-xs:  0 1px 2px rgba(16, 18, 22, 0.04);
+  --shadow-sm:  0 1px 2px rgba(16, 18, 22, 0.05);
+  --shadow-md:  0 1px 3px rgba(16, 18, 22, 0.06), 0 1px 2px rgba(16, 18, 22, 0.04);
+  --shadow-lg:  0 2px 8px -2px rgba(16, 18, 22, 0.08), 0 6px 20px -6px rgba(16, 18, 22, 0.06);
+  --shadow-xl:  0 4px 16px -6px rgba(16, 18, 22, 0.10), 0 10px 32px -10px rgba(16, 18, 22, 0.10);
+  --shadow-2xl: 0 10px 44px -12px rgba(16, 18, 22, 0.18);
+
+  /* Barra de progresso indeterminada (tela de geração de IA) */
+  --animate-indeterminate: indeterminate 1.4s ease-in-out infinite;
+
+  @keyframes indeterminate {
+    0%   { transform: translateX(-100%) scaleX(0.35); }
+    50%  { transform: translateX(0%)    scaleX(0.6); }
+    100% { transform: translateX(100%)  scaleX(0.35); }
   }
 }
 
+html { color-scheme: dark; }
+html.light { color-scheme: light; }
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Títulos: tracking negativo, quebra equilibrada */
+h1, h2, h3 {
+  letter-spacing: -0.021em;
+}
+h1 { letter-spacing: -0.028em; }
+
+/* Números sempre tabulares (scores, %, datas, KPIs) */
+.font-mono,
+[class*="tabular"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Esconde a barra de rolagem mantendo o scroll (tabs horizontais) */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* Menos movimento: neutraliza animações contínuas do sistema */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
