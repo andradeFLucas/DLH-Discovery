@@ -22,6 +22,23 @@ export interface TechnicalDocAgentInput {
   blueprint: MasterBlueprint;
   discovery_answers: DiscoveryAnswers;
   area: string;
+  /** Quando true, falha com erro em vez de devolver o PRD genérico de contingência. */
+  strict?: boolean;
+}
+
+function parseJsonLoose(raw: string | null): any | null {
+  if (!raw) return null;
+  const clean = raw
+    .replace(/^```json\s*/im, '')
+    .replace(/^```\s*/im, '')
+    .replace(/\s*```$/im, '')
+    .trim();
+  try {
+    return JSON.parse(clean);
+  } catch (err) {
+    console.warn('[TechnicalDocAgent] JSON inválido/truncado:', (err as Error).message, '| fim:', clean.slice(-80));
+    return null;
+  }
 }
 
 /**
@@ -103,22 +120,32 @@ ESTRUTURA JSON EXIGIDA:
   ]
 }`;
 
-  try {
-    const aiResult = await callClaudeHaiku(userPrompt, { systemPrompt, maxTokens: 4096 });
-    if (aiResult) {
-      const cleanJsonStr = aiResult
-        .replace(/^```json\s*/im, '')
-        .replace(/^```\s*/im, '')
-        .replace(/\s*```$/im, '')
-        .trim();
+  const partAPrompt = `${userPrompt}
 
-      const parsed = JSON.parse(cleanJsonStr);
-      if (parsed && parsed.macro_modules && parsed.macro_modules.length > 0) {
-        return buildCanonicalPRDFromAI(blueprint, discovery_answers, area, parsed);
-      }
+IMPORTANTE (PARTE 1 de 2): retorne SOMENTE as chaves executive_summary, product_objectives, architecture_overview, architecture_diagram_mermaid, raci_matrix e success_metrics_okrs. NÃO inclua as demais chaves.`;
+  const partBPrompt = `${userPrompt}
+
+IMPORTANTE (PARTE 2 de 2): retorne SOMENTE as chaves macro_modules (máximo 4 módulos, 3 sub-funcionalidades cada), user_stories (máximo 5), custom_database_columns e custom_api_endpoints (máximo 5). NÃO inclua as demais chaves. Seja objetivo para não exceder o limite de tamanho.`;
+
+  try {
+    const [rawA, rawB] = await Promise.all([
+      callClaudeHaiku(partAPrompt, { systemPrompt, maxTokens: 3000 }),
+      callClaudeHaiku(partBPrompt, { systemPrompt, maxTokens: 4096 }),
+    ]);
+
+    const partA = parseJsonLoose(rawA);
+    const partB = parseJsonLoose(rawB);
+
+    if (partA && partB && Array.isArray(partB.macro_modules) && partB.macro_modules.length > 0) {
+      return buildCanonicalPRDFromAI(blueprint, discovery_answers, area, { ...partA, ...partB });
     }
+    console.warn(`[TechnicalDocAgent] Resposta incompleta da IA (parte A: ${!!partA}, parte B: ${!!partB}).`);
   } catch (err) {
-    console.warn('[TechnicalDocAgent] Falha ao processar JSON da IA, aplicando montador determinístico:', err);
+    console.warn('[TechnicalDocAgent] Falha ao chamar a IA:', err);
+  }
+
+  if (input.strict) {
+    throw new Error('A IA não retornou uma Documentação Técnica válida (timeout, chave ausente ou JSON truncado). Veja os logs do servidor.');
   }
 
   // Fallback Canônico de Alta Densidade

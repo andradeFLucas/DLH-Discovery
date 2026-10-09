@@ -7,6 +7,8 @@ export interface PrototypeAgentInput {
   blueprint: MasterBlueprint;
   discovery_answers: DiscoveryAnswers;
   area: string;
+  /** Quando true, falha com erro em vez de devolver o protótipo genérico de contingência. */
+  strict?: boolean;
 }
 
 /**
@@ -69,7 +71,7 @@ ESTRUTURA DO CÓDIGO HTML/JS:
 5. Toast de notificação (<div id="toast" class="fixed bottom-5 right-5 hidden ...">).
 6. <script> no final com as funções globais: showTab(tabId), openModal(), closeModal(), showToast(msg), filterTable().`;
 
-  const rawHtml = await callClaudeHaiku(userPrompt, { systemPrompt, maxTokens: 4096 });
+  const rawHtml = await callClaudeHaiku(userPrompt, { systemPrompt, maxTokens: 6000 });
 
   let finalHtml = '';
   if (rawHtml && rawHtml.includes('<html') && rawHtml.includes('</html>')) {
@@ -78,6 +80,12 @@ ESTRUTURA DO CÓDIGO HTML/JS:
       .replace(/^```\s*/im, '')
       .replace(/\s*```$/im, '')
       .trim();
+  } else {
+    console.warn(`[PrototypeAgent] HTML da IA ausente ou truncado (tamanho: ${rawHtml?.length ?? 0}).`);
+  }
+
+  if ((!finalHtml || finalHtml.length < 500) && input.strict) {
+    throw new Error('A IA não retornou um protótipo HTML válido (timeout, chave ausente ou HTML truncado). Veja os logs do servidor.');
   }
 
   // Fallback caso a API não responda

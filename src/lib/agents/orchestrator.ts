@@ -41,6 +41,8 @@ export interface OrchestratorInput {
   solution: string;
   area: string;
   discovery_answers: DiscoveryAnswers;
+  /** Quando true, falha com erro em vez de devolver o blueprint genérico de contingência. */
+  strict?: boolean;
 }
 
 /**
@@ -112,6 +114,10 @@ ESTRUTURA DO JSON ESPERADO:
     }
   }
 
+  if (input.strict) {
+    throw new Error('A IA não retornou um Master Blueprint válido (timeout, chave ausente ou JSON inválido). Veja os logs do servidor.');
+  }
+
   // Fallback Inteligente Local caso não haja chave da Anthropic configurada ou ocorra erro
   return generateLocalMasterBlueprint(input);
 }
@@ -121,23 +127,31 @@ ESTRUTURA DO JSON ESPERADO:
  */
 function generateLocalMasterBlueprint(input: OrchestratorInput): MasterBlueprint {
   const { title, problem, solution, area, discovery_answers } = input;
-  const fullText = `${title} ${problem} ${solution} ${area} ${JSON.stringify(discovery_answers)}`.toLowerCase();
+  const fullText = `${title} ${problem} ${solution} ${area} ${JSON.stringify(discovery_answers)}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // Pontuação por domínio usando palavras inteiras/radicais (evita falsos positivos como 'os' em 'pos', 'dos').
+  const countHits = (patterns: RegExp[]) => patterns.reduce((acc, re) => acc + (fullText.match(re)?.length ?? 0), 0);
+  const scores: Record<string, number> = {
+    sales_crm: countHits([/\blead/g, /\bvend(a|as|edor|edores)\b/g, /\bcaminh/g, /\bfollow/g, /\bcrm\b/g, /\bproposta/g]),
+    workshop_service: countHits([/\boficina/g, /\brevisa/g, /\bordem de servico/g, /\bo\.?s\b/g, /\bcheck-?in/g, /\bmecanic/g, /\bpos[- ]venda/g, /\bagendamento/g]),
+    trade_in_valuation: countHits([/\bseminov/g, /\bavalia/g, /\busado/g, /\btroca\b/g, /\bfipe\b/g, /\blaudo/g]),
+    gamification_loyalty: countHits([/\bpontua/g, /\bpontos\b/g, /\bresgate/g, /\bclub/g, /\bfidelid/g, /\bgamifica/g]),
+  };
 
   let domain: MasterBlueprint['domain_category'] = 'general_dealer_saas';
   let themeColor = '#6366f1';
-
-  if (fullText.includes('noticia') || fullText.includes('lead') || fullText.includes('venda') || fullText.includes('caminh')) {
-    domain = 'sales_crm';
-    themeColor = '#2563eb';
-  } else if (fullText.includes('oficina') || fullText.includes('revis') || fullText.includes('os') || fullText.includes('peça')) {
-    domain = 'workshop_service';
-    themeColor = '#059669';
-  } else if (fullText.includes('seminov') || fullText.includes('avalia') || fullText.includes('usado') || fullText.includes('troca')) {
-    domain = 'trade_in_valuation';
-    themeColor = '#d97706';
-  } else if (fullText.includes('ponto') || fullText.includes('pontua') || fullText.includes('resgate') || fullText.includes('club')) {
-    domain = 'gamification_loyalty';
-    themeColor = '#7c3aed';
+  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+  if (best && best[1] > 0) {
+    domain = best[0] as MasterBlueprint['domain_category'];
+    themeColor = {
+      sales_crm: '#2563eb',
+      workshop_service: '#059669',
+      trade_in_valuation: '#d97706',
+      gamification_loyalty: '#7c3aed',
+    }[domain as 'sales_crm' | 'workshop_service' | 'trade_in_valuation' | 'gamification_loyalty'];
   }
 
   return {

@@ -185,49 +185,55 @@ export default function EphemeralDiscovery() {
     const activeArea = overrideData?.area ?? area;
     const activeAnswers = overrideData?.answers ?? answers;
 
-    try {
+    const basePayload = {
+      title: activeTitle,
+      problem: activeProblem,
+      solution: activeSolution,
+      area: activeArea,
+      discovery_answers: activeAnswers,
+    };
+
+    // Cada estágio é uma requisição independente (limite de tempo próprio no servidor).
+    const callStage = async (stage: string, extra: Record<string, unknown> = {}) => {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: activeTitle,
-          problem: activeProblem,
-          solution: activeSolution,
-          area: activeArea,
-          discovery_answers: activeAnswers,
-        }),
+        body: JSON.stringify({ ...basePayload, stage, ...extra }),
       });
-
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+        throw new Error(
+          errorData.details ||
+            (res.status === 504
+              ? `Tempo limite excedido no estágio "${stage}".`
+              : errorData.error || `Erro HTTP ${res.status} no estágio "${stage}".`),
+        );
       }
+      return res.json();
+    };
 
-      const data = await res.json();
-      const resolvedAssets = data.assets || data;
-      if (!resolvedAssets || (!resolvedAssets.prototype && !resolvedAssets.technical_doc)) {
-        throw new Error('Formato de resposta inesperado do serviço de IA.');
-      }
+    try {
+      const blueprint = await callStage('blueprint');
+      const [prototype, technical_doc, commercial_deck] = await Promise.all([
+        callStage('prototype', { blueprint }),
+        callStage('technical_doc', { blueprint }),
+        callStage('pitch', { blueprint }),
+      ]);
 
-      setAssets(resolvedAssets);
+      setAssets({
+        prototype,
+        technical_doc,
+        commercial_deck,
+        version: 1,
+        lastUpdated: new Date().toISOString(),
+      });
       setStep('results');
     } catch (err: any) {
-      console.warn('Tentando gerador local de contingência:', err);
-      try {
-        const fallbackAssets = await generateWithMultiAgents({
-          title: activeTitle,
-          problem: activeProblem,
-          solution: activeSolution,
-          area: activeArea,
-          discovery_answers: activeAnswers,
-        });
-        setAssets(fallbackAssets);
-        setStep('results');
-      } catch (fallbackErr: any) {
-        console.error('Erro na geração com IA:', fallbackErr);
-        setGenerationError(err.message || 'Ocorreu um erro ao estruturar sua ideia com a IA. Tente novamente.');
-        setStep('discovery');
-      }
+      console.error('Erro na geração com IA:', err);
+      setGenerationError(
+        `${err?.message || 'Ocorreu um erro ao estruturar sua ideia com a IA.'} Tente novamente.`,
+      );
+      setStep('discovery');
     }
   };
 

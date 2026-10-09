@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { getIdeaById, updateIdea, getGoals, createNotification } from '@/lib/storage';
 import { Idea, GeneratedAssets, PrototypeAsset } from '@/lib/types';
-import { generateIdeaAssets, refinePrototypeAsset, classifyIdeaAlignment } from '@/lib/gemini';
+import { refinePrototypeAsset, classifyIdeaAlignment } from '@/lib/gemini';
 import InteractivePrototype from '@/components/artifacts/InteractivePrototype';
 import LovablePromptViewer from '@/components/artifacts/LovablePromptViewer';
 import TechnicalDocViewer from '@/components/artifacts/TechnicalDocViewer';
@@ -86,42 +86,58 @@ export default function ValidacaoPage() {
   const generateAssets = async (targetIdea: Idea) => {
     setIsGenerating(true);
     setGenerationError(null);
-    try {
-      // 1. Tenta gerar via rota de backend (segura, sem expor chaves no navegador nem sofrer bloqueio CORS)
-      const response = await fetch('/api/ai/generate', {
+
+    const basePayload = {
+      title: targetIdea.title,
+      problem: targetIdea.problem,
+      solution: targetIdea.solution,
+      area: targetIdea.area,
+      discovery_answers: targetIdea.discovery_answers || {},
+    };
+
+    // Cada estágio é uma requisição independente (limite de tempo próprio no servidor).
+    const callStage = async (stage: string, extra: Record<string, unknown> = {}) => {
+      const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: targetIdea.title,
-          problem: targetIdea.problem,
-          solution: targetIdea.solution,
-          area: targetIdea.area,
-          discovery_answers: targetIdea.discovery_answers || {},
-        }),
+        body: JSON.stringify({ ...basePayload, stage, ...extra }),
       });
-
-      if (response.ok) {
-        const generated = await response.json();
-        const updated = updateIdea(targetIdea.id, { assets: generated });
-        if (updated) setIdea(updated);
-        return;
-      }
-
-      // Fallback local caso o endpoint retorne erro
-      const localAssets = await generateIdeaAssets(targetIdea);
-      const updated = updateIdea(targetIdea.id, { assets: localAssets });
-      if (updated) setIdea(updated);
-    } catch (err) {
-      console.warn('Usando gerador inteligente local de contingência:', err);
-      try {
-        const fallbackAssets = await generateIdeaAssets(targetIdea);
-        const updated = updateIdea(targetIdea.id, { assets: fallbackAssets });
-        if (updated) setIdea(updated);
-      } catch {
-        setGenerationError(
-          'Não foi possível gerar os artefatos no momento. Suas respostas do Discovery foram preservadas com sucesso.',
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(
+          errBody?.details ||
+            (res.status === 504
+              ? `Tempo limite excedido no estágio "${stage}".`
+              : `Falha no estágio "${stage}" (HTTP ${res.status}).`),
         );
       }
+      return res.json();
+    };
+
+    try {
+      const blueprint = await callStage('blueprint');
+      const [prototype, technical_doc, commercial_deck] = await Promise.all([
+        callStage('prototype', { blueprint }),
+        callStage('technical_doc', { blueprint }),
+        callStage('pitch', { blueprint }),
+      ]);
+
+      const generated = {
+        prototype,
+        technical_doc,
+        commercial_deck,
+        version: 1,
+        lastUpdated: new Date().toISOString(),
+      };
+      const updated = updateIdea(targetIdea.id, { assets: generated });
+      if (updated) setIdea(updated);
+    } catch (err) {
+      console.error('Falha na geração dos artefatos por IA:', err);
+      setGenerationError(
+        `Não foi possível gerar os artefatos com IA agora. ${
+          err instanceof Error ? err.message : ''
+        } Suas respostas do Discovery foram preservadas; clique em tentar novamente.`,
+      );
     } finally {
       setIsGenerating(false);
     }

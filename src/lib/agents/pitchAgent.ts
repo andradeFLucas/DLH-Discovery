@@ -6,6 +6,8 @@ export interface PitchAgentInput {
   blueprint: MasterBlueprint;
   discovery_answers: DiscoveryAnswers;
   area: string;
+  /** Quando true, falha com erro em vez de devolver o pitch genérico de contingência. */
+  strict?: boolean;
 }
 
 /**
@@ -122,6 +124,10 @@ ESTRUTURA DO JSON ESPERADO (6 SLIDES):
     } catch (e) {
       console.warn('[Pitch Agent] Erro ao fazer parse do JSON do Claude Haiku:', e);
     }
+  }
+
+  if (input.strict) {
+    throw new Error('A IA não retornou uma Apresentação Comercial válida (timeout, chave ausente ou JSON inválido). Veja os logs do servidor.');
   }
 
   // Fallback estruturado local

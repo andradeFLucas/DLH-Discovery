@@ -10,6 +10,8 @@ interface ClaudeCallOptions {
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Tempo máximo (ms) por requisição ao provedor. Padrão: 50s (abaixo do limite de 60s do Vercel Hobby). */
+  timeoutMs?: number;
 }
 
 function getAnthropicApiKey(): string | null {
@@ -56,9 +58,17 @@ async function callAnthropicDirect(
     systemPrompt = 'Você é um arquiteto e consultor sênior de IA especializado no ecossistema automotivo.',
     temperature = 0.7,
     maxTokens = 4096,
+    timeoutMs = 50000,
   } = options;
 
+  const startedAt = Date.now();
+
   for (const model of modelCandidates) {
+    const remaining = timeoutMs - (Date.now() - startedAt);
+    if (remaining < 3000) {
+      console.warn(`[Anthropic] Orçamento de tempo esgotado (${timeoutMs}ms) antes de tentar ${model}.`);
+      break;
+    }
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -68,6 +78,7 @@ async function callAnthropicDirect(
           'anthropic-version': '2023-06-01',
           'dangerously-allow-browser': 'true',
         },
+        signal: AbortSignal.timeout(remaining),
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
@@ -89,6 +100,10 @@ async function callAnthropicDirect(
       }
     } catch (err) {
       console.warn(`[Anthropic] Falha na requisição ao modelo ${model}:`, err);
+      if ((err as any)?.name === 'TimeoutError' || (err as any)?.name === 'AbortError') {
+        // Outro modelo também estouraria o limite da plataforma; falha rápido e visível.
+        break;
+      }
     }
   }
 
