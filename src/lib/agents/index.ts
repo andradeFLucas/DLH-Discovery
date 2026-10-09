@@ -23,6 +23,14 @@ export async function generateWithMultiAgents(
 ): Promise<GeneratedAssets> {
   const { title, problem, solution, area, discovery_answers } = input;
 
+  // No navegador não existem chaves de API: o resultado seria sempre o template genérico de contingência.
+  // A geração real só pode ocorrer no servidor (rota /api/ai/generate, em etapas).
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      'A geração por IA só pode ser executada no servidor. Recarregue a página (Ctrl+F5) e tente novamente.'
+    );
+  }
+
   console.log(`[Multi-Agents] Iniciando Etapa 1: Orquestrador Master (Claude 3.5 Sonnet) para "${title}"...`);
   
   // Etapa 1: Orquestrador analisa o contexto e cria o Blueprint
