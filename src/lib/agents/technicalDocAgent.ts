@@ -120,26 +120,43 @@ ESTRUTURA JSON EXIGIDA:
   ]
 }`;
 
-  const partAPrompt = `${userPrompt}
+  const runPart = (keysAndLimits: string) =>
+    callClaudeHaiku(
+      `${userPrompt}
 
-IMPORTANTE (PARTE 1 de 2): retorne SOMENTE as chaves executive_summary, product_objectives, architecture_overview, architecture_diagram_mermaid, raci_matrix e success_metrics_okrs. NÃO inclua as demais chaves.`;
-  const partBPrompt = `${userPrompt}
-
-IMPORTANTE (PARTE 2 de 2): retorne SOMENTE as chaves macro_modules (máximo 4 módulos, 3 sub-funcionalidades cada), user_stories (máximo 5), custom_database_columns e custom_api_endpoints (máximo 5). NÃO inclua as demais chaves. Seja objetivo para não exceder o limite de tamanho.`;
+IMPORTANTE: retorne SOMENTE as chaves listadas abaixo, no mesmo formato do exemplo. NÃO inclua nenhuma outra chave.
+LIMITES RÍGIDOS (prevalecem sobre qualquer quantidade citada nas diretrizes): o JSON TOTAL deve ter no máximo ~1500 palavras. Seja conciso, sem textos longos, sem comentários, sem markdown.
+${keysAndLimits}`,
+      { systemPrompt, maxTokens: 3000, temperature: 0.4 }
+    );
 
   try {
-    const [rawA, rawB] = await Promise.all([
-      callClaudeHaiku(partAPrompt, { systemPrompt, maxTokens: 3000 }),
-      callClaudeHaiku(partBPrompt, { systemPrompt, maxTokens: 4096 }),
+    const [raw1, raw2, raw3, raw4] = await Promise.all([
+      runPart(
+        `CHAVES: executive_summary (máx 90 palavras), product_objectives (4 itens, máx 18 palavras cada), architecture_overview (máx 60 palavras), architecture_diagram_mermaid (máx 14 nós, sintaxe válida).`
+      ),
+      runPart(
+        `CHAVES: raci_matrix (4 itens, campos curtos), success_metrics_okrs (3 OKRs, 2 key_results curtos cada, com target_timeline e target_roi).`
+      ),
+      runPart(
+        `CHAVES: macro_modules (exatamente 3 módulos; cada um com objective de 1 frase, 3 sub_features com description de até 25 palavras e input_or_extraction curto, e 2 business_rules curtas).`
+      ),
+      runPart(
+        `CHAVES: user_stories (4 histórias; description de 1 frase; acceptance_criteria_gherkin com 3 itens de até 20 palavras), custom_database_columns (máx 10 colunas), custom_api_endpoints (máx 4; payload e response com no máximo 3 campos cada).`
+      ),
     ]);
 
-    const partA = parseJsonLoose(rawA);
-    const partB = parseJsonLoose(rawB);
+    const p1 = parseJsonLoose(raw1);
+    const p2 = parseJsonLoose(raw2);
+    const p3 = parseJsonLoose(raw3);
+    const p4 = parseJsonLoose(raw4);
 
-    if (partA && partB && Array.isArray(partB.macro_modules) && partB.macro_modules.length > 0) {
-      return buildCanonicalPRDFromAI(blueprint, discovery_answers, area, { ...partA, ...partB });
+    if (p3 && p4 && Array.isArray(p3.macro_modules) && p3.macro_modules.length > 0 && Array.isArray(p4.user_stories)) {
+      return buildCanonicalPRDFromAI(blueprint, discovery_answers, area, { ...p1, ...p2, ...p3, ...p4 });
     }
-    console.warn(`[TechnicalDocAgent] Resposta incompleta da IA (parte A: ${!!partA}, parte B: ${!!partB}).`);
+    console.warn(
+      `[TechnicalDocAgent] Resposta incompleta da IA (resumo/arq: ${!!p1}, raci/okrs: ${!!p2}, módulos: ${!!p3}, histórias/schema: ${!!p4}).`
+    );
   } catch (err) {
     console.warn('[TechnicalDocAgent] Falha ao chamar a IA:', err);
   }

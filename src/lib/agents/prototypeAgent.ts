@@ -48,6 +48,8 @@ REGRAS DE ARQUITETURA INTERATIVA (OBRIGATÓRIO):
    - Para Oficina/Pós-Venda: Abas como "1. Recepção & Check-in", "2. Elevadores & Diagnóstico IA", "3. Orçamentos WhatsApp".
    - Para Comercial/Vendas: Abas como "1. Leads & Follow-up", "2. Notícias Casadas", "3. Mensagens Prontas".
 
+LIMITE RÍGIDO DE TAMANHO (CRÍTICO): o arquivo HTML inteiro deve ter NO MÁXIMO 11.000 caracteres (~3.500 tokens). Para isso: use classes Tailwind (sem CSS customizado extenso), sem comentários, no máximo 4-5 linhas de dados mock por tabela/lista, textos curtos, JavaScript enxuto e reutilizável. É melhor um protótipo compacto e COMPLETO (terminando em </html>) do que um longo e cortado.
+
 Retorne APENAS o código HTML completo iniciando estritamente com <!DOCTYPE html> e terminando com </html>. Não inclua blocos de markdown em volta.`;
 
   const userPrompt = `Gere a aplicação SaaS completa, autônoma e interativa para:
