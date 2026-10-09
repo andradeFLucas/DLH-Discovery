@@ -120,29 +120,41 @@ ESTRUTURA JSON EXIGIDA:
   ]
 }`;
 
-  const runPart = (keysAndLimits: string) =>
-    callClaudeHaiku(
-      `${userPrompt}
+  // Contexto do projeto (tudo antes do schema completo). Cada parte recebe SOMENTE o seu próprio schema,
+  // senão o modelo tende a gerar o PRD inteiro em todas as chamadas e estoura o limite de tokens.
+  const contextOnly = userPrompt.split('ESTRUTURA JSON EXIGIDA:')[0].replace(
+    'Gere o PRD Técnico Enterprise completo em JSON para a seguinte solução:',
+    'Contexto da solução para gerar PARTE de um PRD Técnico em JSON:'
+  );
 
-IMPORTANTE: retorne SOMENTE as chaves listadas abaixo, no mesmo formato do exemplo. NÃO inclua nenhuma outra chave.
-LIMITES RÍGIDOS (prevalecem sobre qualquer quantidade citada nas diretrizes): o JSON TOTAL deve ter no máximo ~1500 palavras. Seja conciso, sem textos longos, sem comentários, sem markdown.
-${keysAndLimits}`,
-      { systemPrompt, maxTokens: 3000, temperature: 0.4 }
+  const runPart = (partSchema: string, limits: string) =>
+    callClaudeHaiku(
+      `${contextOnly}
+Gere SOMENTE o JSON abaixo (apenas estas chaves, nenhuma outra). Retorne JSON compacto, em uma única linha, sem indentação, sem markdown e sem comentários.
+LIMITES RÍGIDOS: ${limits} Frases curtas e diretas. Prefira terminar completo a ser extenso.
+
+SCHEMA:
+${partSchema}`,
+      { systemPrompt, maxTokens: 2500, temperature: 0.4 }
     );
 
   try {
     const [raw1, raw2, raw3, raw4] = await Promise.all([
       runPart(
-        `CHAVES: executive_summary (máx 90 palavras), product_objectives (4 itens, máx 18 palavras cada), architecture_overview (máx 60 palavras), architecture_diagram_mermaid (máx 14 nós, sintaxe válida).`
+        `{"executive_summary":"texto","product_objectives":["obj1","obj2","obj3","obj4"],"architecture_overview":"texto","architecture_diagram_mermaid":"graph TD\\\\n  A[App] -->|1| B[API]..."}`,
+        'executive_summary até 90 palavras; 4 objetivos de até 18 palavras; architecture_overview até 60 palavras; Mermaid com no máximo 14 nós e sintaxe válida.'
       ),
       runPart(
-        `CHAVES: raci_matrix (4 itens, campos curtos), success_metrics_okrs (3 OKRs, 2 key_results curtos cada, com target_timeline e target_roi).`
+        `{"raci_matrix":[{"activity":"...","responsible":"...","accountable":"...","consulted":"...","informed":"..."}],"success_metrics_okrs":[{"objective":"...","key_results":["KR1","KR2"],"target_timeline":"60 dias","target_roi":"R$ X/mês"}]}`,
+        'raci_matrix com 4 itens de campos curtos; success_metrics_okrs com 3 OKRs, 2 key_results curtos cada.'
       ),
       runPart(
-        `CHAVES: macro_modules (exatamente 3 módulos; cada um com objective de 1 frase, 3 sub_features com description de até 25 palavras e input_or_extraction curto, e 2 business_rules curtas).`
+        `{"macro_modules":[{"module_number":1,"title":"...","objective":"1 frase","sub_features":[{"name":"...","description":"até 25 palavras","input_or_extraction":"curto"}],"business_rules":["regra curta","regra curta"]}]}`,
+        'exatamente 3 módulos, cada um com 3 sub_features e 2 business_rules.'
       ),
       runPart(
-        `CHAVES: user_stories (4 histórias; description de 1 frase; acceptance_criteria_gherkin com 3 itens de até 20 palavras), custom_database_columns (máx 10 colunas), custom_api_endpoints (máx 4; payload e response com no máximo 3 campos cada).`
+        `{"user_stories":[{"id":"US-01","title":"...","actor":"...","description":"Como..., quero... para...","acceptance_criteria_gherkin":["Dado que...","Quando...","Então..."]}],"custom_database_columns":[{"field":"nome","type":"TIPO_SQL","description":"curta"}],"custom_api_endpoints":[{"method":"POST","path":"/api/v1/...","description":"curta","payload":"{...}","response":"{...}"}]}`,
+        '4 user_stories (critérios Gherkin de até 20 palavras); no máximo 10 custom_database_columns; no máximo 4 custom_api_endpoints com payload/response de até 3 campos.'
       ),
     ]);
 
