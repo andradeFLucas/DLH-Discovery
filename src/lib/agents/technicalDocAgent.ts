@@ -127,6 +127,13 @@ ESTRUTURA JSON EXIGIDA:
     'Contexto da solução para gerar PARTE de um PRD Técnico em JSON:'
   );
 
+  // System prompt específico das partes: o `systemPrompt` global descreve o PRD completo e fazia
+  // cada chamada gerar o documento inteiro (e estourar o limite de tokens).
+  const partSystemPrompt = `Você é um Arquiteto de Software especialista no setor automotivo (projeto "${blueprint.project_title}").
+Você gera SOMENTE um trecho de um PRD, em JSON estrito e válido, contendo EXCLUSIVAMENTE as chaves do SCHEMA recebido.
+NUNCA inclua chaves que não estejam no SCHEMA (ex.: não gere user_stories, macro_modules, raci_matrix etc. se não estiverem no SCHEMA).
+Respeite os LIMITES RÍGIDOS de quantidade e tamanho. Retorne apenas o JSON, em uma única linha.`;
+
   const runPart = (partSchema: string, limits: string) =>
     callClaudeHaiku(
       `${contextOnly}
@@ -135,7 +142,7 @@ LIMITES RÍGIDOS: ${limits} Frases curtas e diretas. Prefira terminar completo a
 
 SCHEMA:
 ${partSchema}`,
-      { systemPrompt, maxTokens: 5000, temperature: 0.4 }
+      { systemPrompt: partSystemPrompt, maxTokens: 5000, temperature: 0.4 }
     );
 
   try {
