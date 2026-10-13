@@ -10,7 +10,7 @@ interface ClaudeCallOptions {
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
-  /** Tempo máximo (ms) por requisição ao provedor. Padrão: 50s (abaixo do limite de 60s do Vercel Hobby). */
+  /** Tempo máximo (ms) por requisição ao provedor. Padrão: 240s (abaixo do maxDuration de 300s das rotas). */
   timeoutMs?: number;
 }
 
@@ -58,7 +58,7 @@ async function callAnthropicDirect(
     systemPrompt = 'Você é um arquiteto e consultor sênior de IA especializado no ecossistema automotivo.',
     temperature = 0.7,
     maxTokens = 4096,
-    timeoutMs = 50000,
+    timeoutMs = 240000,
   } = options;
 
   const startedAt = Date.now();

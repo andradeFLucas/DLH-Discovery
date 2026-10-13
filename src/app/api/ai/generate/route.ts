@@ -7,9 +7,10 @@ import {
   MasterBlueprint,
 } from '@/lib/agents';
 
-// Cada estágio roda em sua própria invocação (cada uma com seu próprio limite de 60s),
+// Cada estágio roda em sua própria invocação (cada uma com seu próprio limite de 300s),
 // em vez de encadear Sonnet + 3 Haiku numa única função que estourava o limite do Vercel.
-export const maxDuration = 60;
+// 300s exige Fluid compute ativo no projeto (Hobby: máx. 300s).
+export const maxDuration = 300;
 
 type Stage = 'blueprint' | 'prototype' | 'technical_doc' | 'pitch';
 
