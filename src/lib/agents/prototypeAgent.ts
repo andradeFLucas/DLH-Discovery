@@ -73,7 +73,7 @@ ESTRUTURA DO CÓDIGO HTML/JS:
 5. Toast de notificação (<div id="toast" class="fixed bottom-5 right-5 hidden ...">).
 6. <script> no final com as funções globais: showTab(tabId), openModal(), closeModal(), showToast(msg), filterTable().`;
 
-  const rawHtml = await callClaudeHaiku(userPrompt, { systemPrompt, maxTokens: 6000 });
+  const rawHtml = await callClaudeHaiku(userPrompt, { systemPrompt, maxTokens: 14000 });
 
   let finalHtml = '';
   if (rawHtml && rawHtml.includes('<html') && rawHtml.includes('</html>')) {

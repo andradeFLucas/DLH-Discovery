@@ -135,7 +135,7 @@ LIMITES RÍGIDOS: ${limits} Frases curtas e diretas. Prefira terminar completo a
 
 SCHEMA:
 ${partSchema}`,
-      { systemPrompt, maxTokens: 2500, temperature: 0.4 }
+      { systemPrompt, maxTokens: 5000, temperature: 0.4 }
     );
 
   try {
